@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+numpy = "*"
+scikit-learn = "*"
+torch = "*"
+tensorflow = "*"
+pandas = "*"
+matplotlib = "*"
+qiskit = "*"
+pylatexenc = "*"
+pennylane = "*"
+jupyter = "*"
+jupyterlab = "<5.0.0a0,>=4.0.0"
+jupyterlab-lsp = "*"
+python-lsp-server = {extras = ["all"], version = "*"}
+
+[requires]
+python_version = "3.10"
