@@ -17,6 +17,7 @@ jupyter = "*"
 jupyterlab = "<5.0.0a0,>=4.0.0"
 jupyterlab-lsp = "*"
 python-lsp-server = {extras = ["all"], version = "*"}
+pennylane-lightning = {extras = ["kokkos"], version = "*"}
 
 [requires]
 python_version = "3.10"
