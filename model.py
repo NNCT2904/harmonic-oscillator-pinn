@@ -1,5 +1,6 @@
 import torch.nn as nn
 import pennylane as qml
+import matplotlib.pyplot as plt
 
 class FCN(nn.Module):
     "Defines a connected network"
@@ -25,9 +26,9 @@ class FCN(nn.Module):
         x = self.fce(x)
         return x
 
-class QN(nn.Module):
+class Hybrid_QN(nn.Module):
     '''
-    Simple 1 qubit model
+    Classical 1 layer -> Quantum layer -> Classical 1 layer
     '''
 
     def __init__(self, N_INPUT: int, N_OUTPUT: int, Q_NODE, N_QUBITS):
@@ -40,4 +41,73 @@ class QN(nn.Module):
         x = self.clayer_1(x)
         x = self.qlayer_1(x)
         x = self.clayer_2(x)
+        return x
+    
+class Pure_QN(nn.Module):
+    def __init__(self, DEVICE, N_QUBITS, N_INPUT_WIRES, N_LAYER, N_OUTPUT_WIRES, ROTATION= 'Ry'):
+        super().__init__()
+
+        self.fcs = nn.Linear(len(N_INPUT_WIRES), N_QUBITS)
+
+        # Quantum Circuit Configurations
+        weight_shape = {
+            'weights': self.quantum_circuit_shape(wires=N_QUBITS, n_layers=N_LAYER, rot=ROTATION)
+        }
+
+        wires = list(range(N_QUBITS))
+
+        qc = self.quantum_circuit(wires=wires, input_wires=wires, output_wires=N_OUTPUT_WIRES, rot=ROTATION)
+
+        q_node = qml.QNode(qc, DEVICE, expansion_strategy='gradient')
+        self.q_node = q_node
+
+        # Quantum layer and model
+
+        quantum_torch_layer = qml.qnn.TorchLayer(q_node, weight_shape)
+
+        self.q_layer = quantum_torch_layer
+
+    def quantum_circuit_shape(self, wires, n_layers=1, rot='Ry'):
+        if rot == 'Ry':
+            shape = qml.BasicEntanglerLayers.shape(n_layers=n_layers, n_wires=wires)
+        elif  rot == 'Rxyz':
+            shape = qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=wires)
+        return shape
+
+    def quantum_circuit(self, wires, input_wires, output_wires, rot='Ry'):
+        def _quantum_circuit(inputs, weights): 
+            # Prepare state H 
+            # [qml.Hadamard(i) for i in wires]
+
+            # Encode classical -> quantum
+            qml.AngleEmbedding(inputs, rotation='Y', wires=wires)
+
+            # Process
+            if rot == 'Ry':
+                qml.BasicEntanglerLayers(weights, rotation=qml.RY, wires=wires)
+            elif rot == 'Rxyz':
+                qml.StronglyEntanglingLayers(weights, wires=wires)
+            
+            # Measurement quantum -> classical
+            return [qml.expval(qml.PauliZ(wires=w)) for w in output_wires]
+        return _quantum_circuit
+    
+    def draw_circuit(self, fontsize=20, style='pennylane', expansion_strategy=None, scale=None, title=None, decimals=2):
+        def _draw_circuit(*args, **kwargs):
+            nonlocal fontsize, style, expansion_strategy, scale, title
+            qml.drawer.use_style(style)
+            if expansion_strategy is None:
+                expansion_strategy = self.q_node.expansion_strategy
+            fig, ax = qml.draw_mpl(self.q_node, decimals=decimals, expansion_strategy=expansion_strategy)(*args, **kwargs)
+            if scale is not None:
+                dpi = fig.get_dpi()
+                fig.set_dpi(dpi*scale)
+            if title is not None:
+                fig.suptitle(title, fontsize=fontsize)
+            plt.show()
+        return _draw_circuit
+        
+    def forward(self, x):
+        x = self.fcs(x)
+        x = self.q_layer(x)
         return x
