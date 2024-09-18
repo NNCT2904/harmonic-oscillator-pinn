@@ -12,4 +12,4 @@ def train(X, Y, model, optimiser, iteration, lossfn, callback = None):
         optimiser.step()
 
         if callback != None: 
-            callback(model, loss)
+            callback(model, loss, model.parameters())

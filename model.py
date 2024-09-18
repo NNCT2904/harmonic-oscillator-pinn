@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import pennylane as qml
 import matplotlib.pyplot as plt
@@ -44,10 +45,16 @@ class Hybrid_QN(nn.Module):
         return x
     
 class Pure_QN(nn.Module):
-    def __init__(self, DEVICE, N_QUBITS, N_INPUT_WIRES, N_LAYER, N_OUTPUT_WIRES, ROTATION= 'Ry'):
+    def __init__(self, DEVICE, N_INPUT, N_QUBITS, N_INPUT_WIRES, N_LAYER, N_OUTPUT_WIRES, ROTATION= 'Ry'):
         super().__init__()
+        self.N_INPUT=N_INPUT
+        self.N_QUBITS=N_QUBITS
+        self.N_INPUT_WIRES=N_INPUT_WIRES
+        self.N_LAYER=N_LAYER
+        self.N_OUTPUT_WIRES=N_OUTPUT_WIRES
 
-        self.fcs = nn.Linear(len(N_INPUT_WIRES), N_QUBITS)
+
+        # self.fcs = nn.Linear(N_INPUT, len(N_INPUT_WIRES)).requires_grad_(False)
 
         # Quantum Circuit Configurations
         weight_shape = {
@@ -56,7 +63,7 @@ class Pure_QN(nn.Module):
 
         wires = list(range(N_QUBITS))
 
-        qc = self.quantum_circuit(wires=wires, input_wires=wires, output_wires=N_OUTPUT_WIRES, rot=ROTATION)
+        qc = self.quantum_circuit(wires=wires, input_wires=N_INPUT_WIRES, output_wires=N_OUTPUT_WIRES, rot=ROTATION)
 
         q_node = qml.QNode(qc, DEVICE, expansion_strategy='gradient')
         self.q_node = q_node
@@ -77,10 +84,10 @@ class Pure_QN(nn.Module):
     def quantum_circuit(self, wires, input_wires, output_wires, rot='Ry'):
         def _quantum_circuit(inputs, weights): 
             # Prepare state H 
-            # [qml.Hadamard(i) for i in wires]
+            [qml.Hadamard(i) for i in wires]
 
             # Encode classical -> quantum
-            qml.AngleEmbedding(inputs, rotation='Y', wires=wires)
+            qml.AngleEmbedding(inputs, rotation='Y', wires=input_wires)
 
             # Process
             if rot == 'Ry':
@@ -92,7 +99,11 @@ class Pure_QN(nn.Module):
             return [qml.expval(qml.PauliZ(wires=w)) for w in output_wires]
         return _quantum_circuit
     
-    def draw_circuit(self, fontsize=20, style='pennylane', expansion_strategy=None, scale=None, title=None, decimals=2):
+    def draw_circuit(self, fontsize=20, style='pennylane', expansion_strategy='gradient', scale=None, title=None, decimals=2):
+
+        data_in = torch.linspace(1,2, len(self.N_INPUT_WIRES)) # Not real data, it is for visualise circuit only
+        
+        @torch.no_grad()
         def _draw_circuit(*args, **kwargs):
             nonlocal fontsize, style, expansion_strategy, scale, title
             qml.drawer.use_style(style)
@@ -105,9 +116,10 @@ class Pure_QN(nn.Module):
             if title is not None:
                 fig.suptitle(title, fontsize=fontsize)
             plt.show()
-        return _draw_circuit
+        _draw_circuit(data_in, list(self.parameters()))
         
     def forward(self, x):
-        x = self.fcs(x)
+        # if self.fcs != None:
+        #     x = self.fcs(x)
         x = self.q_layer(x)
         return x
