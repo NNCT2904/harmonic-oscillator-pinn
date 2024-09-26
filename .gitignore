@@ -1,5 +1,8 @@
 /Harmonic oscillator PINN.ipynb
 /PINN_intro_workshop.ipynb
 /PINN_intro_workshop_student.ipynb
+*.mp4
+./plots
+plots
 /__pycache__
 /oscillator.gif
