@@ -9,7 +9,7 @@ def backend_check():
         print('Backend detected: mps')
         device = torch.device('mps')
     else:
-        print('Bo backend, use CPU')
+        print('No backend, use CPU')
         device = torch.device('cpu')
 
     print('Use .to(device) to send vectors to backend!')
