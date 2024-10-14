@@ -29,19 +29,75 @@ class FCN(nn.Module):
 
 class Hybrid_QN(nn.Module):
     '''
-    Classical 1 layer -> Quantum layer -> Classical 1 layer
+    Quantum layer -> Classical 1 layer
     '''
 
-    def __init__(self, N_INPUT: int, N_OUTPUT: int, Q_NODE, N_QUBITS):
+    def __init__(self, Q_DEVICE, INPUT_DIM:int, OUTPUT_DIM: int, N_QUBITS:int, N_LAYERS:int = 1, ROTATION:str = 'Ry'):
         super().__init__()
-        self.clayer_1= nn.Linear(N_INPUT, N_QUBITS)
-        self.qlayer_1 = Q_NODE
-        self.clayer_2 = nn.Linear(N_QUBITS, N_OUTPUT)
+
+        self.wires = list(range(N_QUBITS))
+        
+        weight_shape = {
+            'weights': self.quantum_circuit_shape(wires=N_QUBITS, n_layers=N_LAYERS, rot=ROTATION)
+        }
+
+        qc = self.quantum_circuit(wires = self.wires, rot=ROTATION)
+        self.q_node = qml.QNode(qc, Q_DEVICE, expansion_strategy='gradient')
+
+
+        self.input_layer= nn.Linear(INPUT_DIM, N_QUBITS)
+        self.quantum_layer = qml.qnn.TorchLayer(self.q_node, weight_shape)
+        # self.quantum_layer = nn.Linear(N_QUBITS, N_QUBITS)
+        self.output_layer = nn.Linear(N_QUBITS, OUTPUT_DIM)
+
+    def quantum_circuit_shape(self, wires, n_layers=1, rot='Ry'):
+        if rot == 'Ry':
+            shape = qml.BasicEntanglerLayers.shape(n_layers=n_layers, n_wires=wires)
+        elif  rot == 'Rxyz':
+            shape = qml.StronglyEntanglingLayers.shape(n_layers=n_layers, n_wires=wires)
+        return shape
+
+    def quantum_circuit(self, wires, rot='Ry'):
+        def _quantum_circuit(inputs, weights): 
+            # Prepare state H 
+            [qml.Hadamard(i) for i in wires]
+
+            # Encode classical -> quantum
+            qml.AngleEmbedding(inputs, rotation='Y', wires=wires)
+
+            # Process
+            if rot == 'Ry':
+                qml.BasicEntanglerLayers(weights, rotation=qml.RY, wires=wires)
+            elif rot == 'Rxyz':
+                qml.StronglyEntanglingLayers(weights, wires=wires)
+            
+            # Measurement quantum -> classical
+            return [qml.expval(qml.PauliZ(wires=w)) for w in wires]
+        return _quantum_circuit
+    
+    def draw_circuit(self, fontsize=20, style='pennylane', expansion_strategy='gradient', scale=None, title=None, decimals=2):
+
+        data_in = torch.linspace(1,2, len(self.wires)) # Not real data, it is for visualise circuit only
+        
+        @torch.no_grad()
+        def _draw_circuit(*args, **kwargs):
+            nonlocal fontsize, style, expansion_strategy, scale, title
+            qml.drawer.use_style(style)
+            if expansion_strategy is None:
+                expansion_strategy = self.q_node.expansion_strategy
+            fig, ax = qml.draw_mpl(self.q_node, decimals=decimals, expansion_strategy=expansion_strategy)(*args, **kwargs)
+            if scale is not None:
+                dpi = fig.get_dpi()
+                fig.set_dpi(dpi*scale)
+            if title is not None:
+                fig.suptitle(title, fontsize=fontsize)
+            plt.show()
+        _draw_circuit(data_in, self.quantum_layer.weights)
 
     def forward(self, x):
-        x = self.clayer_1(x)
-        x = self.qlayer_1(x)
-        x = self.clayer_2(x)
+        x = self.input_layer(x)
+        x = self.quantum_layer(x)
+        x = self.output_layer(x)
         return x
     
 class Pure_QN(nn.Module):
