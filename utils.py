@@ -3,21 +3,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pennylane as qml
 
-def backend_check():
+def backend_check(backend='Auto'):
     print('Backend check')
-
-    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
-        print('Backend detected: mps')
-        device = torch.device('mps')
-    if torch.backends.cuda.is_built():
-        print('Backend detected: cuda')
-        device = torch.device('cuda')        
-    else:
-        print('No backend, use CPU')
-        device = torch.device('cpu')
-
     print('Use .to(device) to send vectors to backend!')
-
+    if backend=='Auto':
+        if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            print('Backend detected: mps')
+            device = torch.device('mps')
+            return device
+        if torch.backends.cuda.is_built():
+            print('Backend detected: cuda')
+            device = torch.device('cuda')    
+            return device    
+        else:
+            print('No backend, use CPU')
+            device = torch.device('cpu')
+            return device
+    else:
+        print(f'Use backend "{backend}"')
+        device = torch.device(backend)    
     return device
 
 
