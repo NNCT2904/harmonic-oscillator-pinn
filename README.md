@@ -12,6 +12,6 @@ Experiment samples will be presented as png files, combine them into a clip with
 
 ``` bash 
 # within the plot subfolders
-cat $(find . -name '*.png' - print | sort -V) | ffmpeg -framerate 60 -i - -c:v libx264 -pix_fmt yuv420p out.mp4
+cat $(find . -name '*.png' | sort -V) | ffmpeg -hwaccel cuda -framerate 60 -i - -c:v libx264 -pix_fmt yuv420p out.mp4
 ```
 
